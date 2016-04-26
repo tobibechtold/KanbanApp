@@ -5,12 +5,31 @@ import NoteActions from '../actions/NoteActions';
 import NoteStore from '../stores/NoteStore';
 import LaneActions from '../actions/LaneActions';
 import Editable from './Editable.jsx';
+import {DropTarget} from 'react-dnd';
+import ItemTypes from '../constants/itemTypes';
 
+const noteTarget = {
+  hover(targetProps, monitor) {
+    const sourceProps = monitor.getItem();
+    const sourceId = sourceProps.id;
+
+    if(!targetProps.lane.notes.length) {
+      LaneActions.attachToLane({
+        laneId: targetProps.lane.id,
+        noteId: sourceId
+      });
+    }
+  }
+};
+
+@DropTarget(ItemTypes.NOTE, noteTarget, (connect) => ({
+  connectDropTarget: connect.dropTarget()
+}))
 export default class Lane extends React.Component {
   render() {
-    const {lane, ...props} = this.props;
+    const {connectDropTarget, lane, ...props} = this.props;
 
-    return (
+    return connectDropTarget(
       <div {...props}>
         <div className="lane-header" onClick={this.activateLaneEdit}>
           <div className="lane-add-note">
@@ -37,6 +56,7 @@ export default class Lane extends React.Component {
     );
   }
   editNote(id, task) {
+    // Don't modify if trying to set an empty value
     if(!task.trim()) {
       NoteActions.update({id, editing: false});
 
@@ -46,7 +66,10 @@ export default class Lane extends React.Component {
     NoteActions.update({id, task, editing: false});
   }
   addNote = (e) => {
+    // If note is added, avoid opening lane name edit by stopping
+    // event bubbling in this case.
     e.stopPropagation();
+
     const laneId = this.props.lane.id;
     const note = NoteActions.create({task: 'New task'});
 
@@ -56,16 +79,18 @@ export default class Lane extends React.Component {
     });
   };
   deleteNote = (noteId, e) => {
+    // Avoid bubbling to edit
     e.stopPropagation();
 
     const laneId = this.props.lane.id;
 
     LaneActions.detachFromLane({laneId, noteId});
-    NoteActions.delete(id);
-  }
+    NoteActions.delete(noteId);
+  };
   editName = (name) => {
     const laneId = this.props.lane.id;
 
+    // Don't modify if trying to set an empty value
     if(!name.trim()) {
       LaneActions.update({id: laneId, editing: false});
 
@@ -73,7 +98,7 @@ export default class Lane extends React.Component {
     }
 
     LaneActions.update({id: laneId, name, editing: false});
-  }
+  };
   deleteLane = () => {
     const laneId = this.props.lane.id;
 
